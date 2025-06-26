@@ -1,13 +1,17 @@
 import re
 import os
-from openai import OpenAI
+from openai import AsyncOpenAI
+from dotenv import load_dotenv
+import asyncio
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+load_dotenv()
+
+client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 max_iterations = 8
 criteria = ["relevance", "coherence", "simplicity", "depth"]
 
-def score_prompt(prompt):
+async def score_prompt(prompt):
     eval_format = "\n".join([f"- {criterion.capitalize()}: [score]" for criterion in criteria])
     instructions = f"""
     Evalue the following prompt based on the criteria {', '.join(criteria)}.
@@ -20,16 +24,17 @@ def score_prompt(prompt):
     - Average Score: [average]
     """
 
-    response = client.chat.completions.create(
+    response = await client.chat.completions.create(
         model = "gpt-4o-mini",
         messages = [
             {"role" : "system", "content" : "You are an AI evaluator tasked with scoring prompts based on certain criteria"},
-            {"role" : "user", "content" : instructions}
-        ]
+            {"role" : "user", "content" : instructions}, 
+        ], 
+        max_tokens=300
     )
     return response.choices[0].message.content
 
-def parse_scores(text):
+async def parse_scores(text):
     scores = {}
     for criterion in criteria:
         match = re.search(fr"{criterion.capitalize()}: (\d+)", text)
@@ -44,9 +49,9 @@ def parse_scores(text):
     return scores
     
 
-def generate_response(prompt, criteria):
+async def generate_response(prompt, criteria):
     criteria_text = f"{', '.join(criteria)}"
-    response = client.chat.completions.create(
+    response = await client.chat.completions.create(
         model = "gpt-4o-mini",
         messages = [
             {"role" : "system", "content" : "You are an AI that elps improve the specifity and clarity of prompts."},
@@ -55,7 +60,7 @@ def generate_response(prompt, criteria):
     )
     return response.choices[0].message.content
 
-def find_improvement(d1, d2):
+async def find_improvement(d1, d2):
     res = []
     for criterion in d1:
         if criterion == "average":
@@ -65,24 +70,24 @@ def find_improvement(d1, d2):
             res.append(criterion)
             
 
-def main():
+async def main():
     initial_prompt = input("Give me a prompt to improve: ")
-    initial_scores = parse_scores(score_prompt(initial_prompt))
+    initial_scores = await parse_scores(await score_prompt(initial_prompt))
     print(f"Initial Scores: {initial_scores}")
     
-    prompt = generate_response(initial_prompt, criteria)
-    scores = parse_scores(score_prompt(prompt))
-    to_improve = find_improvement(initial_scores, scores)
+    prompt = await generate_response(initial_prompt, criteria)
+    scores = await parse_scores(await score_prompt(prompt))
+    to_improve = await find_improvement(initial_scores, scores)
     print(f"Initial Improvement Needed: {to_improve}")
 
     total_iters = 0
     cur_iters = 0
     while cur_iters < 2 or total_iters < max_iterations:
-        prompt = generate_response(prompt, to_improve)
+        prompt = await generate_response(prompt, to_improve)
         print(f"Iteration {total_iters + 1}: {prompt}")
-        cur_scores = parse_scores(score_prompt(prompt))
+        cur_scores = await parse_scores(await score_prompt(prompt))
         print(f"Scores: {cur_scores}")
-        to_improve = find_improvement(scores, cur_scores)
+        to_improve = await find_improvement(scores, cur_scores)
         
         if len(to_improve) == 0:
             cur_iters += 1
@@ -92,4 +97,4 @@ def main():
     print(f"Final Prompt: {prompt}")
 
 if __name__ == '__main__':
-    main()
+    asyncio.run(main())
