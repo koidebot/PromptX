@@ -1,5 +1,5 @@
 import re
-import os
+import os, json
 from openai import AsyncOpenAI
 from dotenv import load_dotenv
 import asyncio
@@ -8,31 +8,48 @@ load_dotenv()
 
 client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-max_iterations = 8
+functions = [
+    {
+        "name": "score_prompt",
+        "description": "Score a prompt on several criteria",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "relevance": {"type": "integer", "minimum": 1, "maximum": 10},
+                "coherence": {"type": "integer", "minimum": 1, "maximum": 10},
+                "simplicity": {"type": "integer", "minimum": 1, "maximum": 10},
+                "depth":     {"type": "integer", "minimum": 1, "maximum": 10},
+                "average":   {"type": "number"}
+            },
+            "required": ["relevance", "coherence", "simplicity", "depth", "average"]
+        }
+    }
+]
+
+max_iterations = 3
 criteria = ["relevance", "coherence", "simplicity", "depth"]
 
 async def score_prompt(prompt):
-    eval_format = "\n".join([f"- {criterion.capitalize()}: [score]" for criterion in criteria])
     instructions = f"""
-    Evalue the following prompt based on the criteria {', '.join(criteria)}.
+    Evaluate the following prompt based on the criteria {', '.join(criteria)}.
     Provide a score for each factor on a scale from 1 to 10 and calculate a final average.
 
     Prompt: "{prompt}"
-
-    Your response should be in this format:
-    {eval_format}
-    - Average Score: [average]
     """
 
     response = await client.chat.completions.create(
         model = "gpt-4o-mini",
         messages = [
-            {"role" : "system", "content" : "You are an AI evaluator tasked with scoring prompts based on certain criteria"},
+            {"role" : "system", "content" : "You are an AI evaluator tasked with scoring prompts based on certain criteria, that returns scores in JSON format"},
             {"role" : "user", "content" : instructions}, 
-        ], 
+        ],
+        functions=functions,
+        function_call={"name" : "score_prompt"},
         max_tokens=300
     )
-    return response.choices[0].message.content
+
+    args = response.choices[0].message.function_call.arguments
+    return json.loads(args)
 
 async def parse_scores(text):
     scores = {}
@@ -72,11 +89,11 @@ async def find_improvement(d1, d2):
 
 async def main():
     initial_prompt = input("Give me a prompt to improve: ")
-    initial_scores = await parse_scores(await score_prompt(initial_prompt))
+    initial_scores = await score_prompt(initial_prompt)
     print(f"Initial Scores: {initial_scores}")
     
     prompt = await generate_response(initial_prompt, criteria)
-    scores = await parse_scores(await score_prompt(prompt))
+    scores = await score_prompt(prompt)
     to_improve = await find_improvement(initial_scores, scores)
     print(f"Initial Improvement Needed: {to_improve}")
 
@@ -85,7 +102,7 @@ async def main():
     while cur_iters < 2 or total_iters < max_iterations:
         prompt = await generate_response(prompt, to_improve)
         print(f"Iteration {total_iters + 1}: {prompt}")
-        cur_scores = await parse_scores(await score_prompt(prompt))
+        cur_scores = await score_prompt(prompt)
         print(f"Scores: {cur_scores}")
         to_improve = await find_improvement(scores, cur_scores)
         
