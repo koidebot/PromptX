@@ -8,7 +8,18 @@ load_dotenv()
 
 client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-functions = [
+max_iterations = 3
+criteria = ["relevance", "coherence", "simplicity", "depth"]
+
+async def score_prompt(prompt):
+    instructions = f"""
+    Evaluate the following prompt based on the criteria {', '.join(criteria)}.
+    Provide a score for each factor on a scale from 1 to 10 and calculate a final average.
+
+    Prompt: "{prompt}"
+    """
+
+    functions = [
     {
         "name": "score_prompt",
         "description": "Score a prompt on several criteria",
@@ -26,17 +37,6 @@ functions = [
     }
 ]
 
-max_iterations = 3
-criteria = ["relevance", "coherence", "simplicity", "depth"]
-
-async def score_prompt(prompt):
-    instructions = f"""
-    Evaluate the following prompt based on the criteria {', '.join(criteria)}.
-    Provide a score for each factor on a scale from 1 to 10 and calculate a final average.
-
-    Prompt: "{prompt}"
-    """
-
     response = await client.chat.completions.create(
         model = "gpt-4o-mini",
         messages = [
@@ -51,31 +51,42 @@ async def score_prompt(prompt):
     args = response.choices[0].message.function_call.arguments
     return json.loads(args)
 
-async def parse_scores(text):
-    scores = {}
-    for criterion in criteria:
-        match = re.search(fr"{criterion.capitalize()}: (\d+)", text)
-        if match:
-            scores[criterion] = int(match.group(1))
-    
-    if scores:
-        scores["average"] = sum(scores.values()) / len(scores)
-    else:
-        scores["average"] = None  
-    
-    return scores
-    
-
 async def generate_response(prompt, criteria):
-    criteria_text = f"{', '.join(criteria)}"
+    functions = [
+        {
+            "name": "refine_prompt",
+            "description": "Return a cleaned-up prompt plus stats",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "refined_prompt": {"type": "string"},
+                    "token_count":    {"type": "integer"},
+                    "keywords_added": {
+                        "type": "array",
+                        "items": {"type": "string"}
+                    },
+                },
+                "required": ["refined_prompt"]
+            }
+        }
+    ]
+
+    criteria_text = ", ".join(criteria)
     response = await client.chat.completions.create(
         model = "gpt-4o-mini",
         messages = [
-            {"role" : "system", "content" : "You are an AI that elps improve the specifity and clarity of prompts."},
+            {"role" : "system", "content" : "You are an AI that helps improve the specifity and clarity of prompts."},
             {"role" : "user", "content" : f"Please refine this prompt: {prompt}, focusing on improving these elements: {criteria_text}"}
-        ]
+        ],
+        functions=functions,
+        function_call={"name":"refine_prompt"}, 
+        max_tokens=300
     )
-    return response.choices[0].message.content
+
+    args_json = response.choices[0].message.function_call.arguments
+    data = json.loads(args_json)
+
+    return data["refined_prompt"]
 
 async def find_improvement(d1, d2):
     res = []
@@ -86,7 +97,6 @@ async def find_improvement(d1, d2):
         if old_score > new_score:
             res.append(criterion)
             
-
 async def main():
     initial_prompt = input("Give me a prompt to improve: ")
     initial_scores = await score_prompt(initial_prompt)
