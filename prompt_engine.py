@@ -3,17 +3,19 @@ import os, json
 from openai import AsyncOpenAI
 from dotenv import load_dotenv
 import asyncio
+from models import PromptRequest, ScoreResponse, ImprovementIteration, JobStatus, JobResponse
+from datetime import datetime
 
 load_dotenv()
 
 client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 max_iterations = 3
-criteria = ["relevance", "coherence", "simplicity", "depth"]
+default_criteria = ["relevance", "coherence", "simplicity", "depth"]
 
 async def score_prompt(prompt):
     instructions = f"""
-    Evaluate the following prompt based on the criteria {', '.join(criteria)}.
+    Evaluate the following prompt based on the criteria {', '.join(default_criteria)}.
     Provide a score for each factor on a scale from 1 to 10 and calculate a final average.
 
     Prompt: "{prompt}"
@@ -92,36 +94,50 @@ async def find_improvement(d1, d2):
     res = []
     for criterion in d1:
         if criterion == "average":
-            return res
+            continue
         old_score, new_score = d1[criterion], d2[criterion]
         if old_score > new_score:
             res.append(criterion)
-            
-async def main():
-    initial_prompt = input("Give me a prompt to improve: ")
-    initial_scores = await score_prompt(initial_prompt)
-    print(f"Initial Scores: {initial_scores}")
-    
-    prompt = await generate_response(initial_prompt, criteria)
-    scores = await score_prompt(prompt)
+
+async def improve_prompt(request):
+    improvement_history = []
+
+    initial_scores = await score_prompt(request.prompt)
+    improved_prompt = await generate_response(request.prompt, request.criteria)
+    scores = await score_prompt(improved_prompt)
     to_improve = await find_improvement(initial_scores, scores)
-    print(f"Initial Improvement Needed: {to_improve}")
 
     total_iters = 0
-    cur_iters = 0
-    while cur_iters < 2 or total_iters < max_iterations:
-        prompt = await generate_response(prompt, to_improve)
-        print(f"Iteration {total_iters + 1}: {prompt}")
-        cur_scores = await score_prompt(prompt)
-        print(f"Scores: {cur_scores}")
-        to_improve = await find_improvement(scores, cur_scores)
-        
-        if len(to_improve) == 0:
-            cur_iters += 1
-        
-        total_iters += 1
-    
-    print(f"Final Prompt: {prompt}")
+    consecutive_improvements = 0
 
-if __name__ == '__main__':
-    asyncio.run(main())
+    while consecutive_improvements < request.min_consecutive_improvements or total_iters < request.max_iterations:
+        improved_prompt = await generate_response(improved_prompt, to_improve if to_improve else request.criteria)
+        current_scores = await score_prompt(improved_prompt, request.criteria)
+        to_improve = await find_improvement(scores, current_scores)
+
+        iteration = ImprovementIteration(
+            iteration=total_iters + 1,
+            prompt=improved_prompt,
+            scores=ScoreResponse(**current_scores),
+            improvements_needed=to_improve,
+            timestamp=datetime.now()
+        )
+        improvement_history.append(iteration)
+
+        if len(to_improve) == 0:
+            consecutive_improvements += 1
+        else:
+            consecutive_improvements = 0
+
+        scores = current_scores
+        total_iters += 1
+
+        if total_iters >= request.max_iterations:
+            break
+
+    return {
+        "status": "completed",
+        "final_prompt": improved_prompt,
+        "iterations": improvement_history,
+        "error": None,
+    }
