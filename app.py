@@ -34,18 +34,31 @@ async def start_prompt_improvement(request: PromptRequest, background_tasks: Bac
 
     async def run_improvement():
         try:
-            result = await improve_prompt(request)
-            jobs[job_id]["status"] = result["status"]
-            jobs[job_id]["final_prompt"] = result["final_prompt"]
-            jobs[job_id]["completed_at"] = datetime.now()
-            if result["iterations"]:
-                jobs[job_id]["progress"] = len(result["iterations"])
-                jobs[job_id]["current_iteration"] = result["iterations"][-1]
-            jobs[job_id]["error"] = result["error"]
+            # Update status to running
+            jobs[job_id]["status"] = "running"
+            
+            # Pass a callback to update progress in real-time
+            async def progress_callback(iteration_data):
+                if job_id in jobs:  # Check if job still exists
+                    jobs[job_id]["progress"] = iteration_data["iteration"]
+                    jobs[job_id]["current_iteration"] = iteration_data
+            
+            result = await improve_prompt(request, progress_callback)
+            
+            # Only update if job still exists (not deleted)
+            if job_id in jobs:
+                jobs[job_id]["status"] = result["status"]
+                jobs[job_id]["final_prompt"] = result["final_prompt"]
+                jobs[job_id]["completed_at"] = datetime.now()
+                if result["iterations"]:
+                    jobs[job_id]["progress"] = len(result["iterations"])
+                    jobs[job_id]["current_iteration"] = result["iterations"][-1]
+                jobs[job_id]["error"] = result["error"]
         except Exception as e:
-            jobs[job_id]["status"] = "failed"
-            jobs[job_id]["error"] = str(e)
-            jobs[job_id]["completed_at"] = datetime.now()
+            if job_id in jobs:  # Only update if job still exists
+                jobs[job_id]["status"] = "failed"
+                jobs[job_id]["error"] = str(e)
+                jobs[job_id]["completed_at"] = datetime.now()
 
     background_tasks.add_task(run_improvement)
 
