@@ -1,10 +1,8 @@
 from fastapi import FastAPI, HTTPException, BackgroundTasks
-from pydantic import BaseModel
-from typing import Optional
 from datetime import datetime
 import uuid
 from dotenv import load_dotenv
-from models import PromptRequest, JobStatus, JobResponse, ImprovementIteration, ScoreResponse
+from models import PromptRequest, JobStatus, JobResponse
 from prompt_engine import improve_prompt
 
 load_dotenv()

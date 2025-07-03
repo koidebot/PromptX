@@ -119,16 +119,13 @@ async def find_improvement(d1, d2):
         old_score, new_score = d1[criterion], d2[criterion]
         if old_score > new_score:
             res.append(criterion)
-    return res  # Fixed: Added missing return statement
+    return res  
 
 async def improve_prompt(request, progress_callback=None):
     try:
         improvement_history = []
-
-        # Get initial scores
         initial_scores = await score_prompt(request.prompt)
         
-        # Generate first improvement
         improved_prompt = await generate_response(request.prompt, request.criteria)
         scores = await score_prompt(improved_prompt) 
         to_improve = await find_improvement(initial_scores, scores)
@@ -137,7 +134,6 @@ async def improve_prompt(request, progress_callback=None):
         consecutive_improvements = 0
 
         while consecutive_improvements < request.min_consecutive_improvements and total_iters < request.max_iterations:
-            # Generate improvement focusing on areas that need work
             criteria_to_focus = to_improve if to_improve else request.criteria
             improved_prompt = await generate_response(improved_prompt, criteria_to_focus)
             current_scores = await score_prompt(improved_prompt)  
