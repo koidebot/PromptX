@@ -32,18 +32,15 @@ async def start_prompt_improvement(request: PromptRequest, background_tasks: Bac
 
     async def run_improvement():
         try:
-            # Update status to running
             jobs[job_id]["status"] = "running"
             
-            # Pass a callback to update progress in real-time
             async def progress_callback(iteration_data):
-                if job_id in jobs:  # Check if job still exists
+                if job_id in jobs: 
                     jobs[job_id]["progress"] = iteration_data["iteration"]
                     jobs[job_id]["current_iteration"] = iteration_data
             
             result = await improve_prompt(request, progress_callback)
             
-            # Only update if job still exists (not deleted)
             if job_id in jobs:
                 jobs[job_id]["status"] = result["status"]
                 jobs[job_id]["final_prompt"] = result["final_prompt"]
@@ -53,7 +50,7 @@ async def start_prompt_improvement(request: PromptRequest, background_tasks: Bac
                     jobs[job_id]["current_iteration"] = result["iterations"][-1]
                 jobs[job_id]["error"] = result["error"]
         except Exception as e:
-            if job_id in jobs:  # Only update if job still exists
+            if job_id in jobs:  
                 jobs[job_id]["status"] = "failed"
                 jobs[job_id]["error"] = str(e)
                 jobs[job_id]["completed_at"] = datetime.now()
