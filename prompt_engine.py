@@ -19,6 +19,7 @@ async def score_prompt(prompt):
     Prompt: "{prompt}"
     """
 
+    # Define function schema for LLM output
     tools = [
         {
             "type": "function",
@@ -41,6 +42,7 @@ async def score_prompt(prompt):
     ]
 
     try:
+        # Call the OpenAI API to score the prompt
         response = await client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
@@ -52,9 +54,11 @@ async def score_prompt(prompt):
             max_tokens=300
         )
 
+        # Extract the tool call arguments from the response
         tool_call = response.choices[0].message.tool_calls[0]
         args = tool_call.function.arguments
         return json.loads(args)
+    
     except Exception as e:
         # Return default scores if API call fails
         return {
@@ -90,6 +94,7 @@ async def generate_response(prompt, criteria):
 
     criteria_text = ", ".join(criteria)
     try:
+        # Call the OpenAI API to refine the prompt
         response = await client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
@@ -101,13 +106,14 @@ async def generate_response(prompt, criteria):
             max_tokens=300
         )
 
+        # Extract the tool call arguments from the response
         tool_call = response.choices[0].message.tool_calls[0]
         args_json = tool_call.function.arguments
         data = json.loads(args_json)
 
         return data["refined_prompt"]
+    
     except Exception as e:
-        # Return original prompt if API call fails
         return prompt
 
 async def find_improvement(d1, d2):
