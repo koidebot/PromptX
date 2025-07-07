@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime
 import uuid
 from dotenv import load_dotenv
@@ -11,6 +12,20 @@ app = FastAPI(
     title="Prompt Engineering API",
     description="API for improving and optimizing prompts using AI evaluation",
     version="1.0.0"
+)
+
+origins = [
+    "http://localhost:3000",  # React default
+    "http://localhost:5173",  # Vite default
+    "http://127.0.0.1:5173",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,  # or ["*"] to allow all
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 jobs = {}
