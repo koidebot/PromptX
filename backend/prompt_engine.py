@@ -7,35 +7,19 @@ from datetime import datetime
 load_dotenv()
 
 class PromptEngine:
-    def __init__(self, 
-                 api_key: str = None,
-                 model: str = "gpt-4o-mini",
-                 default_criteria: list = None,
-                 max_iterations: int = 3):
-        """
-        Initialize the PromptEngine with configuration
-        
-        Args:
-            api_key: OpenAI API key (defaults to env var)
-            model: OpenAI model to use
-            default_criteria: Default scoring criteria
-            max_iterations: Maximum improvement iterations
-        """
+    def __init__(self, api_key, model,default_criteria, max_iterations):
         self.client = AsyncOpenAI(api_key=api_key or os.getenv("OPENAI_API_KEY"))
         self.model = model
         self.max_iterations = max_iterations
         self.default_criteria = default_criteria or ["relevance", "coherence", "simplicity", "depth"]
     
-    async def score_prompt(self, prompt: str) -> dict:
-        """Score a prompt based on the configured criteria"""
+    async def score_prompt(self, prompt):
         instructions = f"""
         Evaluate the following prompt based on the criteria {', '.join(self.default_criteria)}.
         Provide a score for each factor on a scale from 1 to 10 and calculate a final average.
 
         Prompt: "{prompt}"
         """
-
-        # Define function schema for LLM output
         tools = [
             {
                 "type": "function",
@@ -71,11 +55,9 @@ class PromptEngine:
             return json.loads(args)
         
         except Exception as e:
-            # Return default scores if API call fails
             return {criterion: 5 for criterion in self.default_criteria} | {"average": 5.0}
 
-    async def generate_response(self, prompt: str, criteria: list) -> str:
-        """Generate an improved version of the prompt"""
+    async def generate_response(self, prompt, criteria):
         tools = [
             {
                 "type": "function",
@@ -120,8 +102,7 @@ class PromptEngine:
         except Exception as e:
             return prompt
 
-    async def find_improvement(self, d1: dict, d2: dict) -> list:
-        """Find criteria that need improvement (where new scores are lower than old scores)"""
+    async def find_improvement(self, d1, d2):
         res = []
         for criterion in d1:
             if criterion == "average":
@@ -132,7 +113,6 @@ class PromptEngine:
         return res  
 
     async def improve_prompt(self, request, progress_callback=None):
-        """Main method to improve a prompt through iterative refinement"""
         try:
             improvement_history = []
             initial_scores = await self.score_prompt(request.prompt)
