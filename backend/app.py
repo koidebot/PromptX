@@ -4,7 +4,8 @@ from datetime import datetime
 import uuid
 from dotenv import load_dotenv
 from models import PromptRequest, JobStatus, JobResponse
-from prompt_engine import improve_prompt
+from prompt_engine import PromptEngine, improve_prompt
+
 
 load_dotenv()
 
