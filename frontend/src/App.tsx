@@ -3,6 +3,9 @@
 import type React from "react"
 import { useState, useEffect } from "react"
 
+
+const BASE_URL = import.meta.env.VITE_BACKEND_URL
+
 const App: React.FC = () => {
   const [prompt, setPrompt] = useState<string>("")
   const [improvedPrompt, setImprovedPrompt] = useState<string>("")
@@ -19,9 +22,10 @@ const App: React.FC = () => {
     if (!prompt.trim()) return
 
     setIsLoading(true)
+    console.log(BASE_URL)
 
     try {
-      const response = await fetch("http://localhost:8000/improve-prompt", {
+      const response = await fetch(`${BASE_URL}/improve-prompt`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -35,7 +39,7 @@ const App: React.FC = () => {
       const jobId = data.job_id;
 
       const pollJob = async() => {
-        const resultResponse = await fetch(`http://localhost:8000/job/${jobId}`);
+        const resultResponse = await fetch(`${BASE_URL}/job/${jobId}`);
         const result = await resultResponse.json();
 
         if (result.status === "completed" && result.final_prompt){
@@ -56,7 +60,6 @@ const App: React.FC = () => {
     }
   }
     
-
   return (
   <div className="flex flex-col min-h-screen w-full bg-white dark:bg-black text-gray-900 dark:text-white">
     {/* Header */}
