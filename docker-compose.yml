@@ -1,0 +1,13 @@
+version: '3'
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      - OPENAI_API_KEY=your_key_here
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:80"

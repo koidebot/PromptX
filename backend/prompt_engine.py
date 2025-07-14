@@ -7,7 +7,11 @@ from datetime import datetime
 load_dotenv()
 
 class PromptEngine:
-    def __init__(self, api_key, model,default_criteria, max_iterations):
+    def __init__(self, 
+                 api_key: str = None,
+                 model: str = "gpt-4o-mini",
+                 default_criteria: list = None,
+                 max_iterations: int = 3):
         self.client = AsyncOpenAI(api_key=api_key or os.getenv("OPENAI_API_KEY"))
         self.model = model
         self.max_iterations = max_iterations
