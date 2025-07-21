@@ -89,8 +89,8 @@ class PromptEngine:
             response = await self.client.chat.completions.create(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": "You are an AI that helps improve the specificity and clarity of prompts."},
-                    {"role": "user", "content": f"Please refine this prompt: {prompt}, focusing on improving these elements: {criteria_text}"}
+                    {"role": "system", "content": "You are an AI that helps improve prompts."},
+                    {"role": "user", "content": f"Please refine this prompt: {prompt}. Make this prompt better by refining the {criteria_text} of the prompt"}
                 ],
                 tools=tools,
                 tool_choice={"type": "function", "function": {"name": "refine_prompt"}}, 
