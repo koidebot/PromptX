@@ -39,3 +39,26 @@ class JobResponse(BaseModel):
     job_id: str
     status: str
     message: str
+
+class UserCreate(BaseModel):
+    email: str
+    password: str
+
+class UserLogin(BaseModel):
+    email: str
+    password: str
+
+class UserResponse(BaseModel):
+    id: str
+    email: str
+    total_prompts: int
+    total_jobs: int
+    created_at: datetime
+
+# Prompt history models
+class PromptHistoryResponse(BaseModel):
+    id: str
+    original_prompt: str
+    improved_prompt: str
+    total_iterations: int
+    created_at: datetime

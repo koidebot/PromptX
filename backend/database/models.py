@@ -10,7 +10,6 @@ class User(Base):
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
 
     email = Column(String, unique=True, nullable=False, index=True)
-    username = Column(String, unique=True, nullable=False, index=True)
     hashed_password = Column(String, nullable=False)
 
     created_at = Column(DateTime)
@@ -25,7 +24,7 @@ class User(Base):
     prompt_results = relationship("PromptResults", back_populates="user")
 
     def __repr__(self):
-        return f"<User(id='{self.id}', username='{self.username}', email='{self.email}')>"
+        return f"<User(id='{self.id}', email='{self.email}')>"
     
 class PromptResults(Base):
     __tablename__ = 'prompt_results'

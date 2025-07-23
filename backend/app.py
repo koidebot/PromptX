@@ -1,10 +1,17 @@
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.orm import Session
 from datetime import datetime
 import uuid
 from dotenv import load_dotenv
-from models import PromptRequest, JobStatus, JobResponse
+from models import PromptRequest, JobStatus, JobResponse, UserCreate, UserLogin, UserResponse, PromptHistoryResponse
+from typing import List
 from prompt_engine import PromptEngine, improve_prompt
+from services.prompt_service import PromptService
+from services.user_service import UserService
+from auth.dependencies import get_current_user
+from database.connections import get_db
+from database.models import User
 
 
 load_dotenv()
@@ -31,8 +38,65 @@ app.add_middleware(
 
 jobs = {}
 
+# Authentication endpoints
+@app.post("/auth/register")
+async def register(user_data: UserCreate, db: Session = Depends(get_db)):
+    user_service = UserService(db)
+    try:
+        user = user_service.create_user(
+            email=user_data.email,
+            password=user_data.password
+        )
+        return {"message": "User created successfully", "user_id": user.id}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/auth/login")
+async def login(user_data: UserLogin, db: Session = Depends(get_db)):
+    user_service = UserService(db)
+    try:
+        result = user_service.login_user(user_data.email, user_data.password)
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=401, detail=str(e))
+
+@app.get("/auth/me", response_model=UserResponse)
+async def get_current_user_info(current_user: User = Depends(get_current_user)):
+    return UserResponse(
+        id=current_user.id,
+        email=current_user.email,
+        total_prompts=current_user.total_prompts,
+        total_jobs=current_user.total_jobs,
+        created_at=current_user.created_at
+    )
+
+# Prompt history endpoints
+@app.get("/prompt-history", response_model=List[PromptHistoryResponse])
+async def get_prompt_history(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    prompt_service = PromptService(db, current_user.id)
+    history = prompt_service.get_user_prompt_history()
+    
+    return [
+        PromptHistoryResponse(
+            id=prompt.id,
+            original_prompt=prompt.original_prompt,
+            improved_prompt=prompt.improved_prompt,
+            total_iterations=prompt.total_iterations,
+            created_at=prompt.created_at
+        )
+        for prompt in history
+    ]
+
 @app.post("/improve-prompt", response_model=JobResponse)
-async def start_prompt_improvement(request: PromptRequest, background_tasks: BackgroundTasks):
+async def start_prompt_improvement(
+    request: PromptRequest, 
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
     job_id = str(uuid.uuid4())
     jobs[job_id] = {
         "job_id": job_id,

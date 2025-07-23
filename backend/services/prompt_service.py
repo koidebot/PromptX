@@ -20,11 +20,14 @@ class PromptService:
         self.db.commit()
         return res
 
-    def get_user_prompt_history(self):
-        return self.db.query(PromptResults).filter(PromptResults.user_id == self.user_id).all()
+    def get_user_prompt_history(self, limit: int=50):
+        return self.db.query(PromptResults).filter(PromptResults.user_id == self.user_id).order_by(PromptResults.created_at.desc()).limit(limit).all()
 
     def get_prompt_by_id(self, prompt_id: str):
-        return self.db.query(PromptResults).filter(PromptResults.id == prompt_id).first()
+        return (self.db.query(PromptResults)
+              .filter(PromptResults.id == prompt_id,
+                     PromptResults.user_id == self.user_id)
+              .first())
 
     def delete_prompt(self, prompt_id: str):
         self.db.query(PromptResults.filter(PromptResults.id == prompt_id).delete())
