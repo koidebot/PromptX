@@ -2,7 +2,7 @@ from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Boolean, T
 from sqlalchemy.orm import relationship
 from database.connections import Base
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 class User(Base):
     __tablename__ = 'users'
@@ -35,7 +35,7 @@ class PromptResults(Base):
     improved_prompt = Column(Text, nullable=False)
     total_iterations = Column(Integer, default=0)
 
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     user = relationship("User", back_populates="prompt_results")
 

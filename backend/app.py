@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime
 import uuid
 from dotenv import load_dotenv
-from models import PromptRequest, JobStatus, JobResponse, UserCreate, UserLogin, UserResponse, PromptHistoryResponse
+from models import PromptRequest, JobStatus, JobResponse, UserCreate, UserLogin, UserResponse
 from typing import List
 from prompt_engine import PromptEngine, improve_prompt
 from services.prompt_service import PromptService
@@ -38,7 +38,6 @@ app.add_middleware(
 
 jobs = {}
 
-# Authentication endpoints
 @app.post("/auth/register")
 async def register(user_data: UserCreate, db: Session = Depends(get_db)):
     user_service = UserService(db)
@@ -71,7 +70,7 @@ async def get_current_user_info(current_user: User = Depends(get_current_user)):
     )
 
 # Prompt history endpoints
-@app.get("/prompt-history", response_model=List[PromptHistoryResponse])
+@app.get("/prompt-history")
 async def get_prompt_history(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -79,16 +78,18 @@ async def get_prompt_history(
     prompt_service = PromptService(db, current_user.id)
     history = prompt_service.get_user_prompt_history()
     
-    return [
-        PromptHistoryResponse(
-            id=prompt.id,
-            original_prompt=prompt.original_prompt,
-            improved_prompt=prompt.improved_prompt,
-            total_iterations=prompt.total_iterations,
-            created_at=prompt.created_at
-        )
+    prompts = [
+        {
+            "id": prompt.id,
+            "initial_prompt": prompt.original_prompt,
+            "final_prompt": prompt.improved_prompt,
+            "optimization_score": min(100, max(0, prompt.total_iterations * 10 + 50)),  # Convert iterations to a score
+            "created_at": prompt.created_at.isoformat()
+        }
         for prompt in history
     ]
+    
+    return {"prompts": prompts}
 
 @app.post("/improve-prompt", response_model=JobResponse)
 async def start_prompt_improvement(
@@ -129,6 +130,18 @@ async def start_prompt_improvement(
                     jobs[job_id]["progress"] = len(result["iterations"])
                     jobs[job_id]["current_iteration"] = result["iterations"][-1]
                 jobs[job_id]["error"] = result["error"]
+                
+                # Save to database if successful
+                if result["status"] == "completed" and result["final_prompt"]:
+                    prompt_service = PromptService(db, current_user.id)
+                    iterations_count = len(result["iterations"]) if result["iterations"] else 0
+                    prompt_service.save_prompt_result(
+                        original_prompt=request.prompt,
+                        improved_prompt=result["final_prompt"], 
+                        total_iterations=iterations_count
+                    )
+                    prompt_service.update_user_stats()
+                    
         except Exception as e:
             if job_id in jobs:  
                 jobs[job_id]["status"] = "failed"
