@@ -1,12 +1,11 @@
-version: '3'
 services:
   backend:
     build: ./backend
     ports:
       - "8000:8000"
     environment:
-      - OPENAI_API_KEY=your_key_here
-      - SECRET_KEY=PYpYpzh0dlhFKZKvPzA6dUNDSJeoqAy3MLA1QTBOpko
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - SECRET_KEY=${SECRET_KEY}
 
   frontend:
     build: ./frontend
