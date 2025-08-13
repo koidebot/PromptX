@@ -6,6 +6,7 @@ services:
       - "8000:8000"
     environment:
       - OPENAI_API_KEY=your_key_here
+      - SECRET_KEY=PYpYpzh0dlhFKZKvPzA6dUNDSJeoqAy3MLA1QTBOpko
 
   frontend:
     build: ./frontend
