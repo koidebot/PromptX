@@ -36,4 +36,16 @@ Thumbs.db
 
 # === Misc ===
 *.log
-CLAUDE.md
+CLAUDE.md# Environment files
+.env
+.env.local
+.env.*.local
+
+# Virtual environments
+backend/promptX/
+
+# Dependencies
+node_modules/
+
+# Logs
+*.log
