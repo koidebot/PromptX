@@ -5,10 +5,10 @@ from datetime import datetime
 default_criteria = ["relevance", "coherence", "simplicity", "depth"]
 
 class PromptRequest(BaseModel):
-    prompt: str
+    prompt: str = Field(min_length=10, max_length=5000, description="Prompt text between 10-5000 characters")
     criteria: Optional[List[str]] = Field(default=default_criteria)
-    max_iterations: Optional[int] = Field(default=8)
-    min_consecutive_improvements: Optional[int] = Field(default=2)
+    max_iterations: Optional[int] = Field(default=8, ge=1, le=20, description="Number of iterations between 1-20")
+    min_consecutive_improvements: Optional[int] = Field(default=2, ge=1, le=5, description="Consecutive improvements between 1-5")
 
 class ScoreResponse(BaseModel):
     relevance: Optional[int]

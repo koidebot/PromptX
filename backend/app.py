@@ -1,9 +1,11 @@
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
-from datetime import datetime
+from datetime import datetime, timedelta
 import uuid
 from dotenv import load_dotenv
+from functools import wraps
+from collections import defaultdict
 from models import PromptRequest, JobStatus, JobResponse, UserCreate, UserLogin, UserResponse
 from typing import List
 from prompt_engine import PromptEngine, improve_prompt
@@ -37,6 +39,49 @@ app.add_middleware(
 )
 
 jobs = {}
+
+# User-based rate limiting storage
+user_requests = defaultdict(list)  # {user_id: [timestamp1, timestamp2, ...]}
+
+def user_rate_limit(max_requests: int, window_hours: int = 24):
+    """Decorator for user-based rate limiting"""
+    def decorator(func):
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            # Extract current_user from kwargs
+            current_user = None
+            for arg_name, arg_value in kwargs.items():
+                if arg_name == 'current_user' and hasattr(arg_value, 'id'):
+                    current_user = arg_value
+                    break
+            
+            if not current_user:
+                raise HTTPException(status_code=500, detail="Rate limiting error: No user found")
+            
+            user_id = current_user.id
+            now = datetime.now()
+            window_start = now - timedelta(hours=window_hours)
+            
+            # Clean old requests outside the window
+            user_requests[user_id] = [
+                req_time for req_time in user_requests[user_id] 
+                if req_time > window_start
+            ]
+            
+            # Check if user has exceeded the limit
+            if len(user_requests[user_id]) >= max_requests:
+                raise HTTPException(
+                    status_code=429, 
+                    detail=f"Rate limit exceeded: {max_requests} requests per {window_hours} hours"
+                )
+            
+            # Add current request timestamp
+            user_requests[user_id].append(now)
+            
+            # Call the original function
+            return await func(*args, **kwargs)
+        return wrapper
+    return decorator
 
 @app.post("/auth/register")
 async def register(user_data: UserCreate, db: Session = Depends(get_db)):
@@ -92,6 +137,7 @@ async def get_prompt_history(
     return {"prompts": prompts}
 
 @app.post("/improve-prompt", response_model=JobResponse)
+@user_rate_limit(max_requests=5, window_hours=24)  # 5 requests per day per user
 async def start_prompt_improvement(
     request: PromptRequest, 
     background_tasks: BackgroundTasks,
@@ -101,6 +147,7 @@ async def start_prompt_improvement(
     job_id = str(uuid.uuid4())
     jobs[job_id] = {
         "job_id": job_id,
+        "user_id": current_user.id,
         "status": "pending",
         "progress": 0,
         "total_iterations": request.max_iterations,
@@ -157,19 +204,33 @@ async def start_prompt_improvement(
     )
 
 @app.get("/job/{job_id}", response_model=JobStatus)
-async def get_job_status(job_id: str):
+async def get_job_status(job_id: str, current_user: User = Depends(get_current_user)):
     if job_id not in jobs:
         raise HTTPException(status_code=404, detail="Job not found")
-    return JobStatus(**jobs[job_id])
+    
+    job = jobs[job_id]
+    if job["user_id"] != current_user.id:
+        raise HTTPException(status_code=403, detail="Access denied: Job belongs to another user")
+    
+    return JobStatus(**job)
 
 @app.get("/jobs")
-async def list_jobs():
-    return {"jobs": list(jobs.keys()), "total": len(jobs)}
+async def list_jobs(current_user: User = Depends(get_current_user)):
+    user_jobs = {
+        job_id: job for job_id, job in jobs.items() 
+        if job["user_id"] == current_user.id
+    }
+    return {"jobs": list(user_jobs.keys()), "total": len(user_jobs)}
 
 @app.delete("/job/{job_id}")
-async def delete_job(job_id: str):
+async def delete_job(job_id: str, current_user: User = Depends(get_current_user)):
     if job_id not in jobs:
         raise HTTPException(status_code=404, detail="Job not found")
+    
+    job = jobs[job_id]
+    if job["user_id"] != current_user.id:
+        raise HTTPException(status_code=403, detail="Access denied: Job belongs to another user")
+    
     del jobs[job_id]
     return {"message": f"Job {job_id} deleted successfully"}
 

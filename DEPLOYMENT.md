@@ -14,11 +14,13 @@ This guide covers deploying PromptX using GitHub Actions for CI/CD and Docker fo
 ## Environment Setup
 
 1. Copy `.env.example` to `.env` and configure:
+
 ```bash
 cp .env.example .env
 ```
 
 2. Set required environment variables:
+
 - `OPENAI_API_KEY`: Your OpenAI API key
 - `JWT_SECRET_KEY`: Secret key for JWT tokens
 - `GITHUB_REPOSITORY`: Your GitHub repository (username/repo-name)
@@ -44,16 +46,19 @@ Configure these in your repository settings:
 ### Option 1: Docker Compose (Recommended)
 
 1. On your server, create deployment directory:
+
 ```bash
 mkdir promptx-deploy && cd promptx-deploy
 ```
 
 2. Copy production compose file:
+
 ```bash
 wget https://raw.githubusercontent.com/your-username/promptx/main/docker-compose.prod.yml
 ```
 
 3. Set environment variables:
+
 ```bash
 export OPENAI_API_KEY="your-key"
 export JWT_SECRET_KEY="your-secret"
@@ -61,6 +66,7 @@ export GITHUB_REPOSITORY="your-username/promptx"
 ```
 
 4. Deploy:
+
 ```bash
 docker-compose -f docker-compose.prod.yml up -d
 ```
