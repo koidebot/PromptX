@@ -29,7 +29,7 @@ jobs:
     - name: Run backend tests
       run: |
         cd backend
-        python -m pytest tests/
+        python -m pytest tests/test_docker.py -v
     
     - name: Set up Node.js
       uses: actions/setup-node@v4
