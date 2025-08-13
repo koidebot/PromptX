@@ -19,8 +19,6 @@ pip-delete-this-directory.txt
 
 # === Docker ===
 docker-compose.override.yml
-*.dockerignore
-Dockerfile*
 
 # === IDE / Editor ===
 .vscode/
