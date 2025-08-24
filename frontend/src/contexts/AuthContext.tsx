@@ -2,6 +2,9 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 
 const BASE_URL = import.meta.env.VITE_BACKEND_URL;
 
+console.log('BASE_URL from env:', BASE_URL);
+console.log('All env vars:', import.meta.env);
+
 interface User {
   id: string;
   email: string;
@@ -86,6 +89,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const register = async (email: string, password: string) => {
+    console.log('Registering with URL:', `${BASE_URL}/auth/register`);
     const response = await fetch(`${BASE_URL}/auth/register`, {
       method: 'POST',
       headers: {
